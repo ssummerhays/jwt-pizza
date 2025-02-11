@@ -259,3 +259,19 @@ test("create and delete store as franchisee", async ({ page }) => {
   await expect(page.locator("tbody")).toContainText("SLC");
   await expect(page.locator("tbody")).not.toContainText("testStore");
 });
+
+test("about, history, and not found pages", async ({page}) => {
+    await page.goto('http://localhost:5173/');
+    
+    // Click about page
+    await page.getByRole('link', { name: 'About' }).click();
+    await expect(page.getByRole('main')).toContainText('The secret sauce');
+
+    // Click history page
+    await page.getByRole('link', { name: 'History' }).click();
+    await expect(page.getByRole('heading')).toContainText('Mama Rucci, my my');
+
+    // Attempt to visit a non existant page
+    await page.goto('http://localhost:5173/history/badlink');
+    await expect(page.getByRole('main')).toContainText('It looks like we have dropped a pizza on the floor. Please try another page.');
+});
