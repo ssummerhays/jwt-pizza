@@ -1,3 +1,4 @@
+import exp from "constants";
 import { test, expect } from "playwright-test-coverage";
 
 test("home page", async ({ page }) => {
@@ -119,4 +120,142 @@ test("purchase with login", async ({ page }) => {
 
   // Check balance
   await expect(page.getByText("0.008")).toBeVisible();
+});
+
+test("create and delete store as franchisee", async ({ page }) => {
+  await page.route("*/**/api/auth", async (route) => {
+    const loginReq = { email: "f@jwt.com", password: "franchisee" };
+    const loginRes = {
+      user: {
+        id: 3,
+        name: "pizza franchisee",
+        email: "f@jwt.com",
+        roles: [{ objectId: 1, role: "franchisee" }],
+      },
+      token: "abcdef",
+    };
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().postDataJSON()).toMatchObject(loginReq);
+    await route.fulfill({ json: loginRes });
+  });
+
+  let initialState = true;
+  await page.route("*/**/api/franchise/*", async (route) => {
+    const franchiseRes = initialState
+      ? [
+          {
+            id: 1,
+            name: "pizzaPocket",
+            admins: [
+              {
+                id: 3,
+                name: "pizza franchisee",
+                email: "f@jwt.com",
+              },
+            ],
+            stores: [
+              {
+                id: 1,
+                name: "SLC",
+                totalRevenue: 0.4996,
+              },
+            ],
+          },
+        ]
+      : [
+          {
+            id: 1,
+            name: "pizzaPocket",
+            admins: [
+              {
+                id: 3,
+                name: "pizza franchisee",
+                email: "f@jwt.com",
+              },
+            ],
+            stores: [
+              {
+                id: 1,
+                name: "SLC",
+                totalRevenue: 0.4996,
+              },
+              {
+                id: 2,
+                name: "testStore",
+                totalRevenue: 0.0,
+              },
+            ],
+          },
+        ];
+    expect(route.request().method()).toBe("GET");
+    await route.fulfill({ json: franchiseRes });
+    initialState = false;
+  });
+
+  await page.route("*/**/api/franchise/*/store", async (route) => {
+    const createStoreReq = {
+      id: "",
+      name: "testStore",
+    };
+    const createStoreRes = {
+      id: 35,
+      franchiseId: 1,
+      name: "testStore",
+    };
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toMatchObject(createStoreReq);
+    await route.fulfill({ json: createStoreRes });
+  });
+
+  await page.route("*/**/api/franchise/*/store/*", async (route) => {
+    const deleteStoreRes = {
+      message: "store deleted",
+    };
+    expect(route.request().method()).toBe("DELETE");
+    await route.fulfill({ json: deleteStoreRes });
+  });
+
+  await page.goto("http://localhost:5173/");
+
+  // Login
+  await page.getByRole("link", { name: "Login" }).click();
+  await expect(page.getByRole("heading")).toContainText("Welcome back");
+  await page.getByRole("textbox", { name: "Email address" }).fill("f@jwt.com");
+  await page.getByRole("textbox", { name: "Password" }).click();
+  await page.getByRole("textbox", { name: "Password" }).fill("franchisee");
+  await page.getByText("Welcome back").click();
+  await page.getByRole("button", { name: "Login" }).click();
+  await expect(page.getByRole("heading")).toContainText("The web's best pizza");
+
+  // Click franchise link
+  await page
+    .getByLabel("Global")
+    .getByRole("link", { name: "Franchise" })
+    .click();
+  await page.getByText("Everything you need to run an").click();
+  await expect(page.getByRole("main")).toContainText(
+    "Everything you need to run an JWT Pizza franchise. Your gateway to success."
+  );
+
+  // Create test store
+  await page.getByRole("button", { name: "Create store" }).click();
+  await expect(page.getByRole("heading")).toContainText("Create store");
+  await page.getByRole("textbox", { name: "store name" }).click();
+  await page.getByRole("textbox", { name: "store name" }).fill("testStore");
+  await page.getByText("Create store").click();
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.locator("tbody")).toContainText("testStore");
+
+  // Close test store
+  await page
+    .getByRole("row", { name: "testStore 0 ₿ Close" })
+    .getByRole("button")
+    .click();
+  await expect(page.getByRole("main")).toContainText(
+    "Are you sure you want to close the pizzaPocket store testStore ? This cannot be restored. All outstanding revenue with not be refunded."
+  );
+  initialState = true;
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator("tbody")).toContainText("SLC");
+  await expect(page.locator("tbody")).not.toContainText("testStore");
 });
