@@ -1,5 +1,6 @@
 import exp from "constants";
 import { test, expect } from "playwright-test-coverage";
+import { json } from "stream/consumers";
 
 test("home page", async ({ page }) => {
   await page.goto("/");
@@ -337,4 +338,162 @@ test("register new diner, view profile page, and logout", async ({ page }) => {
   register = false;
   await page.getByRole("link", { name: "Logout" }).click();
   await expect(page.getByRole("heading")).toContainText("The web's best pizza");
+});
+
+test("create and delete test franchise", async ({ page }) => {
+  await page.route("**/api/auth", (route) => {
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({
+        user: {
+          id: 913,
+          name: "e46b3qqqpm",
+          email: "e46b3qqqpm@admin.com",
+          roles: [{ role: "admin" }],
+        },
+        token:
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OTEzLCJuYW1lIjoiZTQ2YjNxcXFwbSIsImVtYWlsIjoiZTQ2YjNxcXFwbUBhZG1pbi5jb20iLCJyb2xlcyI6W3sicm9sZSI6ImFkbWluIn1dLCJpYXQiOjE3MzkzMzg4Mzl9.ehtMY3aoZdTkyAxOxathixERX6XOetyrS-e3ry9XdBc",
+      }),
+    });
+  });
+
+  let initialState = true;
+  await page.route("**/api/franchise", (route) => {
+    if (route.request().method() === "POST") {
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          stores: [],
+          id: 212,
+          name: "test",
+          admins: [
+            {
+              email: "e46b3qqqpm@admin.com",
+              id: 913,
+              name: "e46b3qqqpm",
+            },
+          ],
+        }),
+      });
+    } else {
+      if (initialState) {
+        initialState = !initialState;
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify([
+            {
+              id: 1,
+              name: "pizzaPocket",
+              admins: [
+                {
+                  id: 3,
+                  name: "pizza franchisee",
+                  email: "f@jwt.com",
+                },
+              ],
+              stores: [
+                {
+                  id: 1,
+                  name: "SLC",
+                  totalRevenue: 0.4996,
+                },
+              ],
+            },
+          ]),
+        });
+      } else {
+        initialState = !initialState;
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify([
+            {
+              id: 1,
+              name: "pizzaPocket",
+              admins: [
+                {
+                  id: 3,
+                  name: "pizza franchisee",
+                  email: "f@jwt.com",
+                },
+              ],
+              stores: [
+                {
+                  id: 1,
+                  name: "SLC",
+                  totalRevenue: 0.4996,
+                },
+              ],
+            },
+            {
+              id: 212,
+              name: "test",
+              admins: [
+                {
+                  email: "e46b3qqqpm@admin.com",
+                  id: 913,
+                  name: "e46b3qqqpm",
+                },
+              ],
+              stores: [],
+            },
+          ]),
+        });
+      }
+    }
+  });
+
+  await page.route("**/api/franchise/212", (route) => {
+    if (route.request().method() === "DELETE") {
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          message: "franchise deleted",
+        }),
+      });
+    }
+  });
+
+  await page.goto("http://localhost:5173/");
+
+  // Login admin user
+  await page.getByRole("link", { name: "Login" }).click();
+  await page.getByRole("textbox", { name: "Email address" }).click();
+  await page
+    .getByRole("textbox", { name: "Email address" })
+    .fill("e46b3qqqpm@admin.com");
+  await page.getByRole("textbox", { name: "Password" }).click();
+  await page.getByRole("textbox", { name: "Password" }).fill("toomanysecrets");
+  await page.getByRole("button", { name: "Login" }).click();
+  await page.getByRole("link", { name: "Admin" }).click();
+  await expect(page.getByRole("main")).toContainText(
+    "Keep the dough rolling and the franchises signing up."
+  );
+  await expect(page.getByRole("table")).toContainText("pizzaPocket");
+
+  // Navigate to admin dashboard
+  await page.getByRole("button", { name: "Add Franchise" }).click();
+  await expect(page.locator("form")).toContainText("Want to create franchise?");
+
+  // Create new test franchise
+  await page.getByRole("textbox", { name: "franchise name" }).click();
+  await page.getByRole("textbox", { name: "franchise name" }).fill("test");
+  await page.getByRole("textbox", { name: "franchisee admin email" }).click();
+  await page
+    .getByRole("textbox", { name: "franchisee admin email" })
+    .fill("e46b3qqqpm@admin.com");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("table")).toContainText("test");
+
+  // Close test franchise
+  await page
+    .getByRole("row", { name: "test e46b3qqqpm Close" })
+    .getByRole("button")
+    .click();
+  await expect(page.getByRole("main")).toContainText(
+    "Are you sure you want to close the test franchise? This will close all associated stores and cannot be restored. All outstanding revenue with not be refunded."
+  );
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("table")).toContainText("pizzaPocket");
+  await expect(page.getByRole("table")).not.toContainText("test");
+  await page.getByRole("link", { name: "home" }).click();
 });
