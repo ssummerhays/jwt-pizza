@@ -253,7 +253,7 @@ test("create and delete store as franchisee", async ({ page }) => {
     .getByRole("button")
     .click();
   await expect(page.getByRole("main")).toContainText(
-    "Are you sure you want to close the pizzaPocket store testStore ? This cannot be restored. All outstanding revenue with not be refunded."
+    "Are you sure you want to close the pizzaPocket store testStore ? This cannot be restored. All outstanding revenue will not be refunded."
   );
   initialState = true;
   await page.getByRole("button", { name: "Close" }).click();
@@ -490,7 +490,7 @@ test("create and delete test franchise", async ({ page }) => {
     .getByRole("button")
     .click();
   await expect(page.getByRole("main")).toContainText(
-    "Are you sure you want to close the test franchise? This will close all associated stores and cannot be restored. All outstanding revenue with not be refunded."
+    "Are you sure you want to close the test franchise? This will close all associated stores and cannot be restored. All outstanding revenue will not be refunded."
   );
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("table")).toContainText("pizzaPocket");
