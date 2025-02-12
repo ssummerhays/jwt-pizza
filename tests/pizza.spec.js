@@ -260,18 +260,81 @@ test("create and delete store as franchisee", async ({ page }) => {
   await expect(page.locator("tbody")).not.toContainText("testStore");
 });
 
-test("about, history, and not found pages", async ({page}) => {
-    await page.goto('http://localhost:5173/');
-    
-    // Click about page
-    await page.getByRole('link', { name: 'About' }).click();
-    await expect(page.getByRole('main')).toContainText('The secret sauce');
+test("about, history, and not found pages", async ({ page }) => {
+  await page.goto("http://localhost:5173/");
 
-    // Click history page
-    await page.getByRole('link', { name: 'History' }).click();
-    await expect(page.getByRole('heading')).toContainText('Mama Rucci, my my');
+  // Click about page
+  await page.getByRole("link", { name: "About" }).click();
+  await expect(page.getByRole("main")).toContainText("The secret sauce");
 
-    // Attempt to visit a non existant page
-    await page.goto('http://localhost:5173/history/badlink');
-    await expect(page.getByRole('main')).toContainText('It looks like we have dropped a pizza on the floor. Please try another page.');
+  // Click history page
+  await page.getByRole("link", { name: "History" }).click();
+  await expect(page.getByRole("heading")).toContainText("Mama Rucci, my my");
+
+  // Attempt to visit a non existant page
+  await page.goto("http://localhost:5173/history/badlink");
+  await expect(page.getByRole("main")).toContainText(
+    "It looks like we have dropped a pizza on the floor. Please try another page."
+  );
+});
+
+test("register new diner, view profile page, and logout", async ({ page }) => {
+  let register = true;
+  await page.route("*/**/api/auth", async (route) => {
+    if (register) {
+      const registerReq = {
+        name: "testDiner",
+        email: "td@jwt.com",
+        password: "td",
+      };
+      const registerRes = {
+        user: {
+          name: "testDiner",
+          email: "td@jwt.com",
+          roles: [
+            {
+              role: "diner",
+            },
+          ],
+          id: 1791,
+        },
+        token: "abcdef",
+      };
+      expect(route.request().method()).toBe("POST");
+      expect(route.request().postDataJSON()).toMatchObject(registerReq);
+      await route.fulfill({ json: registerRes });
+    } else {
+      const logoutRes = {
+        message: "logout successful",
+      };
+      expect(route.request().method()).toBe("DELETE");
+      await route.fulfill({ json: logoutRes });
+    }
+  });
+
+  await page.goto("http://localhost:5173/");
+
+  // Register test diner
+  await page.getByRole("link", { name: "Register" }).click();
+  await expect(page.getByRole("heading")).toContainText("Welcome to the party");
+  await page.getByRole("textbox", { name: "Full name" }).click();
+  await page.getByRole("textbox", { name: "Full name" }).fill("testDiner");
+  await page.getByRole("textbox", { name: "Email address" }).click();
+  await page.getByRole("textbox", { name: "Email address" }).fill("td@jwt.com");
+  await page.getByRole("textbox", { name: "Password" }).click();
+  await page.getByRole("textbox", { name: "Password" }).fill("td");
+  await page.getByText("Welcome to the party").click();
+  await page.getByRole("button", { name: "Register" }).click();
+
+  // View profile page
+  await page.getByRole("link", { name: "t", exact: true }).click();
+  await expect(page.getByRole("main")).toContainText("testDiner");
+  await expect(page.getByRole("main")).toContainText(
+    "How have you lived this long without having a pizza? Buy one now!"
+  );
+
+  // Logout test diner
+  register = false;
+  await page.getByRole("link", { name: "Logout" }).click();
+  await expect(page.getByRole("heading")).toContainText("The web's best pizza");
 });
