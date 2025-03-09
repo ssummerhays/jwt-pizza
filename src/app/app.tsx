@@ -26,7 +26,6 @@ import { pizzaService } from '../service/service';
 import { Role, User } from '../service/pizzaService';
 import 'preline/preline';
 
-// Meaningless comment
 declare global {
   interface Window {
     HSStaticMethods: any;
