@@ -14,11 +14,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20.x"
-
       - name: set version
         id: set_version
         run: |
@@ -26,8 +21,14 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           printf '{"version": "%s" }' "$version" > public/version.json
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
       - name: Build
         run: |
+          printf '{"version": "%s" }' ${{steps.set_version.outputs.version}} > public/version.json
           npm ci && npm run build
 
       - name: Run tests
@@ -51,11 +52,11 @@ jobs:
     permissions:
       id-token: write
     runs-on: ubuntu-latest
+    env:
+      version: ${{needs.build.outputs.version}}
     environment:
       name: staging
       url: https://stage-pizza.sws329.click
-    env:
-      version: ${{needs.build.outputs.version}}
     steps:
       - name: Create OIDC token to AWS
         uses: aws-actions/configure-aws-credentials@v4
